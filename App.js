@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, ScrollView } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import * as XLSX from 'xlsx';
@@ -15,7 +15,7 @@ const SearchScreen = ({ navigation }) => {
   useEffect(() => {
     const loadExcelData = async () => {
       try {
-        const googleDriveFileId = '1urvb-cVAaqkhX1lQdS96qi2ZS7IvtW73';
+        const googleDriveFileId = '1bfBK0sr8uTexRi6SOhQxepQtNPs3bY_u';
         const url = `https://drive.google.com/uc?export=download&id=${googleDriveFileId}`;
   
         const response = await fetch(url);
@@ -32,7 +32,7 @@ const SearchScreen = ({ navigation }) => {
         // Create a lookup table
         const table = {};
         const firstRow = excelData[0];
-        const columnKey = Object.keys(firstRow).find(key => key.trim() === 'USN No.');
+        const columnKey = Object.keys(firstRow).find(key => key.trim() === 'Stud UID');
   
         if (columnKey) {
           excelData.forEach(row => {
@@ -69,9 +69,13 @@ const SearchScreen = ({ navigation }) => {
 
     const found = lookupTable[uniqueId.trim().toLowerCase()];
 
-    const resultMessage = found ? 'Yes Bus Facility is available.' : 'Bus Facility is not available.';
+    if (found) {
+      // Navigate to the result screen with the full details
+      navigation.navigate('Result', { result: found });
+    } else {
+      navigation.navigate('Result', { result: 'Bus Facility is not available.' });
+    }
     setUniqueId(''); // Reset the input
-    navigation.navigate('Result', { result: resultMessage }); // Pass the result directly
   };
 
   return (
@@ -99,24 +103,43 @@ const SearchScreen = ({ navigation }) => {
 };
 
 const ResultScreen = ({ route }) => {
-  const { result } = route.params;
+  const result = route.params.result;
 
-  // Conditionally set the image based on the result
-  const resultImage = result === 'Yes Bus Facility is available.'
-    ? require('./assets/right.png') // Image for positive result
-    : require('./assets/wrong.png'); // Image for negative result
+  // Check if the result is an object (found row) or a string (error message)
+  if (typeof result === 'string') {
+    return (
+      <View style={styles.resultContainer}>
+        <Text style={styles.resultText}>{result}</Text>
+      </View>
+    );
+  }
+
+  // Extract data from the result
+  const { 'Form No': formNo, 'Stud UID': usn, 'NAME': name, 'Year': year, 'BRANCH': branch, 'Bus Pickup Point': busPickup, 'Remark': remark } = result;
+
+  // If the remark contains a URL for the photo, extract it
+  const photoUrl = 'https://www.google.com/url?sa=i&url=https%3A%2F%2Fwww.pinterest.com%2Fpin%2F598908450470808557%2F&psig=AOvVaw3MbimQPsrVwuBddfXPq_Op&ust=1727855658555000&source=images&cd=vfe&opi=89978449&ved=0CBQQjRxqFwoTCIisoIra7IgDFQAAAAAdAAAAABAE';
 
   return (
-    <View style={styles.resultContainer}>
-      <Image
-        style={styles.imageRight}
-        source={resultImage}
-      />
-      <Text style={styles.resultText}>{result}</Text>
-    </View>
+    <ScrollView contentContainerStyle={styles.resultContainer}>
+      {/* Display the image */}
+      {photoUrl && (
+        <Image
+          style={styles.photo}
+          source={{ uri: photoUrl }}
+        />
+      )}
+      <View style={styles.textContainer}>
+      <Text style={styles.resultText}>Form No.: {formNo}</Text>
+      <Text style={styles.resultText}>USN No.: {usn}</Text>
+      <Text style={styles.resultText}>Name: {name}</Text>
+      <Text style={styles.resultText}>Year: {year}</Text>
+      <Text style={styles.resultText}>Branch: {branch}</Text>
+      <Text style={styles.resultText}>Bus Pickup Point: {busPickup}</Text>
+      </View>
+    </ScrollView>
   );
 };
-
 
 const App = () => {
   return (
@@ -209,24 +232,31 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     resizeMode: 'contain',
   },
-  imageRight: {
-    width: '100%',
-    height: 100,
-    marginBottom: 4,
-    marginTop: -100,
-    resizeMode: 'contain',
+  photo: {
+    width: 200,
+    height: 200,
+    marginBottom: 20,
+    borderRadius: 100,
   },
   resultContainer: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     backgroundColor: '#d9eecad2',
+    padding: 14,
+  },
+  textContainer: {
+    borderColor: '#0f0f0f',
+    borderWidth: 1,
+    borderRadius: 8,
+    textAlign: 'left',
   },
   resultText: {
-    fontSize: 24,
+    fontSize: 20,
     color: '#2B2968',
-    marginTop: 34,
-    textAlign: 'center',
+    marginTop: 10,
+    textAlign: 'left',
+    paddingHorizontal: 10,
   },
 });
 
