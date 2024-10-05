@@ -1,13 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, ScrollView } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
-import * as XLSX from 'xlsx';
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Image,
+  ScrollView,
+} from "react-native";
+import { NavigationContainer } from "@react-navigation/native";
+import { createStackNavigator } from "@react-navigation/stack";
+import * as XLSX from "xlsx";
 
 const Stack = createStackNavigator();
 
 const SearchScreen = ({ navigation }) => {
-  const [uniqueId, setUniqueId] = useState('');
+  const [uniqueId, setUniqueId] = useState("");
   const [lookupTable, setLookupTable] = useState(null); // Lookup table to speed up the search
   const [isLoading, setIsLoading] = useState(true); // Track if data is still loading
 
@@ -15,27 +23,31 @@ const SearchScreen = ({ navigation }) => {
   useEffect(() => {
     const loadExcelData = async () => {
       try {
-        const googleDriveFileId = '1bfBK0sr8uTexRi6SOhQxepQtNPs3bY_u';
+        const googleDriveFileId = "1bfBK0sr8uTexRi6SOhQxepQtNPs3bY_u";
         const url = `https://drive.google.com/uc?export=download&id=${googleDriveFileId}`;
-  
+
         const response = await fetch(url);
         const fileData = await response.arrayBuffer();
         const data = new Uint8Array(fileData);
-        const arr = Array.from(data).map(x => String.fromCharCode(x)).join('');
-  
-        const workbook = XLSX.read(arr, { type: 'binary' });
+        const arr = Array.from(data)
+          .map((x) => String.fromCharCode(x))
+          .join("");
+
+        const workbook = XLSX.read(arr, { type: "binary" });
         const firstSheet = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheet];
-  
+
         const excelData = XLSX.utils.sheet_to_json(worksheet);
-  
+
         // Create a lookup table
         const table = {};
         const firstRow = excelData[0];
-        const columnKey = Object.keys(firstRow).find(key => key.trim() === 'Stud UID');
-  
+        const columnKey = Object.keys(firstRow).find(
+          (key) => key.trim() === "Stud UID"
+        );
+
         if (columnKey) {
-          excelData.forEach(row => {
+          excelData.forEach((row) => {
             const usnValue = row[columnKey]?.trim().toLowerCase();
             if (usnValue) {
               table[usnValue] = row;
@@ -43,27 +55,27 @@ const SearchScreen = ({ navigation }) => {
           });
           setLookupTable(table); // Set the lookup table
         } else {
-          console.error('Error: USN No. column not found');
+          console.error("Error: USN No. column not found");
         }
       } catch (error) {
-        console.error('Error loading Excel data:', error);
+        console.error("Error loading Excel data:", error);
       } finally {
         setIsLoading(false); // Data is fully loaded
       }
     };
-    
+
     loadExcelData();
   }, []);
 
   // Function to search for the unique ID in the lookup table
   const searchInExcel = () => {
     if (isLoading) {
-      setResult('Data is still loading, please wait.');
+      setResult("Data is still loading, please wait.");
       return;
     }
 
     if (!lookupTable) {
-      setResult('Error: Unable to load data.');
+      setResult("Error: Unable to load data.");
       return;
     }
 
@@ -71,20 +83,20 @@ const SearchScreen = ({ navigation }) => {
 
     if (found) {
       // Navigate to the result screen with the full details
-      navigation.navigate('Result', { result: found });
+      navigation.navigate("Result", { result: found });
     } else {
-      navigation.navigate('Result', { result: 'Bus Facility is not available.' });
+      // If not found, navigate with a default message and photo
+      navigation.navigate("Result", {
+        result: "Bus Facility is not available.",
+        photo: "wrong",
+      });
     }
-    setUniqueId(''); // Reset the input
+    setUniqueId(""); // Reset the input
   };
 
   return (
     <View style={styles.container}>
-      {/* Image from assets folder */}
-      <Image
-        style={styles.image}
-        source={require('./assets/sbjit_logo.png')}
-      />
+      <Image style={styles.image} source={require("./assets/sbjit_logo.png")} />
 
       <View style={styles.formContainer}>
         <TextInput
@@ -104,38 +116,65 @@ const SearchScreen = ({ navigation }) => {
 
 const ResultScreen = ({ route }) => {
   const result = route.params.result;
+  const photo = route.params.photo;
 
-  // Check if the result is an object (found row) or a string (error message)
-  if (typeof result === 'string') {
+  // Check if the result is a string (error message) or an object (found row)
+  if (typeof result === "string") {
     return (
       <View style={styles.resultContainer}>
+        {/* Display the fallback image and error message */}
+        <Image style={styles.photo} source={require("./assets/wrong.png")} />
         <Text style={styles.resultText}>{result}</Text>
       </View>
     );
   }
 
-  // Extract data from the result
-  const { 'Form No': formNo, 'Stud UID': usn, 'NAME': name, 'Year': year, 'BRANCH': branch, 'Bus Pickup Point': busPickup, 'Remark': remark } = result;
+  // Extract data from the result (valid row found)
+  const {
+    "Form No": formNo,
+    "Stud UID": usn,
+    NAME: name,
+    Year: year,
+    BRANCH: branch,
+    "Bus Pickup Point": busPickup,
+    Remark: remark,
+  } = result;
 
-  // If the remark contains a URL for the photo, extract it
-  const photoUrl = 'https://www.google.com/url?sa=i&url=https%3A%2F%2Fwww.pinterest.com%2Fpin%2F598908450470808557%2F&psig=AOvVaw3MbimQPsrVwuBddfXPq_Op&ust=1727855658555000&source=images&cd=vfe&opi=89978449&ved=0CBQQjRxqFwoTCIisoIra7IgDFQAAAAAdAAAAABAE';
+  // Check if the remark contains a valid URL for the photo, else use a fallback image
+  const photoUrl =
+    remark && remark.startsWith("http")
+      ? { uri: remark }
+      : require("./assets/right.png");
 
   return (
     <ScrollView contentContainerStyle={styles.resultContainer}>
-      {/* Display the image */}
-      {photoUrl && (
-        <Image
-          style={styles.photo}
-          source={{ uri: photoUrl }}
-        />
-      )}
+      {/* Display the image dynamically */}
+      <Image style={styles.photo} source={photoUrl} />
       <View style={styles.textContainer}>
-      <Text style={styles.resultText}>Form No.: {formNo}</Text>
-      <Text style={styles.resultText}>USN No.: {usn}</Text>
-      <Text style={styles.resultText}>Name: {name}</Text>
-      <Text style={styles.resultText}>Year: {year}</Text>
-      <Text style={styles.resultText}>Branch: {branch}</Text>
-      <Text style={styles.resultText}>Bus Pickup Point: {busPickup}</Text>
+        <Text style={styles.resultText}>
+          <Text style={{ fontWeight: "bold" }}>Form No.: </Text>
+          {formNo}
+        </Text>
+        <Text style={styles.resultText}>
+          <Text style={{ fontWeight: "bold" }}>USN No.: </Text>
+          {usn}
+        </Text>
+        <Text style={styles.resultText}>
+          <Text style={{ fontWeight: "bold" }}>Name: </Text>
+          {name}
+        </Text>
+        <Text style={styles.resultText}>
+          <Text style={{ fontWeight: "bold" }}>Year: </Text>
+          {year}
+        </Text>
+        <Text style={styles.resultText}>
+          <Text style={{ fontWeight: "bold" }}>Branch: </Text>
+          {branch}
+        </Text>
+        <Text style={styles.resultText}>
+          <Text style={{ fontWeight: "bold" }}>Bus Pickup Point: </Text>
+          {busPickup}
+        </Text>
       </View>
     </ScrollView>
   );
@@ -149,18 +188,18 @@ const App = () => {
           name="Search"
           component={SearchScreen}
           options={{
-            title: 'Search',
+            title: "Search",
             headerStyle: {
-              backgroundColor: '#676693',
+              backgroundColor: "#676693",
               height: 80, // Adjust height to increase the app bar's appearance
             },
-            headerTintColor: '#fff',
+            headerTintColor: "#fff",
             headerTitleStyle: {
-              fontWeight: 'bold',
+              fontWeight: "bold",
               fontSize: 24, // Increase the font size for the app bar title
-              fontFamily: 'serif', // Change font style, replace with desired font family
-              textAlign: 'center', // Center the title text
-              width: '100%', // Make title span the entire width
+              fontFamily: "serif", // Change font style, replace with desired font family
+              textAlign: "center", // Center the title text
+              width: "100%", // Make title span the entire width
             },
           }}
         />
@@ -168,18 +207,18 @@ const App = () => {
           name="Result"
           component={ResultScreen}
           options={{
-            title: 'Result',
+            title: "Result",
             headerStyle: {
-              backgroundColor: '#676693',
+              backgroundColor: "#676693",
               height: 80, // Same app bar height for consistency
             },
-            headerTintColor: '#fff',
+            headerTintColor: "#fff",
             headerTitleStyle: {
-              fontWeight: 'bold',
+              fontWeight: "bold",
               fontSize: 24,
-              fontFamily: 'serif', // Change font style for consistency
-              textAlign: 'center',
-              width: '100%',
+              fontFamily: "serif", // Change font style for consistency
+              textAlign: "center",
+              width: "100%",
             },
           }}
         />
@@ -191,46 +230,46 @@ const App = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     padding: 20,
     marginTop: -180,
-    backgroundColor: '#d9eecad2',
+    backgroundColor: "#d9eecad2",
   },
   formContainer: {
     borderWidth: 2,
-    borderColor: '#514e51',
+    borderColor: "#514e51",
     borderRadius: 10,
     padding: 20,
-    backgroundColor: '#87c55ecd',
+    backgroundColor: "#87c55ecd",
   },
   input: {
     height: 50,
-    borderColor: '#0f0f0f',
+    borderColor: "#0f0f0f",
     borderWidth: 1,
     borderRadius: 8,
-    backgroundColor: '#d9eecad2',
-    color: '#0e0d0d',
+    backgroundColor: "#d9eecad2",
+    color: "#0e0d0d",
     paddingHorizontal: 10,
     marginBottom: 20,
     fontSize: 16,
   },
   button: {
-    backgroundColor: '#8c88f7',
+    backgroundColor: "#8c88f7",
     paddingVertical: 10,
     marginHorizontal: 74,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
   },
   buttonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   image: {
-    width: '100%',
+    width: "100%",
     height: 200,
     marginBottom: 4,
-    resizeMode: 'contain',
+    resizeMode: "contain",
   },
   photo: {
     width: 200,
@@ -240,22 +279,23 @@ const styles = StyleSheet.create({
   },
   resultContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    backgroundColor: '#d9eecad2',
-    padding: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#d9eecad2",
+    padding: 4,
   },
   textContainer: {
-    borderColor: '#0f0f0f',
+    borderColor: "#0f0f0f",
     borderWidth: 1,
     borderRadius: 8,
-    textAlign: 'left',
+    textAlign: "left",
+    paddingBottom: 10,
   },
   resultText: {
     fontSize: 20,
-    color: '#2B2968',
+    color: "#2B2968",
     marginTop: 10,
-    textAlign: 'left',
+    textAlign: "left",
     paddingHorizontal: 10,
   },
 });

@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "BusApp",
-    "slug": "BusApp",
+    "name": "SBJIT_Bus_App",
+    "slug": "SBJIT_Bus_App",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
